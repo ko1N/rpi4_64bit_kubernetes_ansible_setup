@@ -1,0 +1,121 @@
+---
+- hosts: all
+  become: true
+  gather_facts: false
+  pre_tasks:
+    - name: install python
+      raw: test -e /usr/bin/python || (apt -qqy update && apt install -y python)
+      register: output
+      changed_when: output.stdout != ""
+
+- hosts: all
+  become: true
+  vars:
+    sshd: ssh
+    sshd_config: /etc/ssh/sshd_config
+  handlers:
+    - name: restart sshd
+      service: name={{ sshd }} state=restarted
+  tasks:
+    - name: Upgrade all apt packages
+      apt: upgrade=dist force_apt_get=yes
+
+    - name: Install apt packages
+      apt:
+        name: ['python3', 'python3-pip', 'htop', 'wget', 'curl', 'git', 'net-tools', 'tmux', 'vim', 'fish']
+        state: latest
+        update_cache: yes
+
+    - name: Setup boot behaviour
+      command: raspi-config nonint do_boot_behaviour B1
+
+    - name: Update hostname
+      command: "raspi-config nonint do_hostname {{ hostname }}"
+
+    - name: Enable ssh
+      command: raspi-config nonint do_ssh 0
+
+    - name: Ensure group "docker" exists
+      group:
+        name: docker
+        state: present
+
+    - name: Add 'pi' user to docker group
+      user: 
+        name: pi
+        groups: docker
+        state: present
+
+    - name: Change pi user password
+      user:
+        name: pi
+        update_password: always
+        password: "{{ newpassword|password_hash('sha512') }}"
+
+    - name: Create user account
+      user: 
+        name: "{{ lookup('env', 'USER') }}"
+        groups: "adm,dialout,cdrom,sudo,audio,video,plugdev,games,users,input,netdev,lpadmin,gpio,i2c,spi,docker"
+        shell: /usr/bin/fish
+        state: present
+
+    - name: Change new user password
+      user:
+        user: "{{ lookup('env', 'USER') }}"
+        update_password: always
+        password: "{{ newpassword|password_hash('sha512') }}"
+
+    - name: Add identity key to authorized keys on host
+      authorized_key: 
+        name: "{{ lookup('env', 'USER') }}"
+        key: "{{ lookup('file', lookup('env','HOME') + '/.ssh/id_rsa.pub') }}"
+      register: add_identity_key
+
+    - name: Disable empty password login
+      lineinfile:
+        dest: "{{ sshd_config }}"
+        regexp: '^#?PermitEmptyPasswords'
+        line: 'PermitEmptyPasswords no'
+      notify: restart sshd
+
+    - name: Disable remote root login
+      lineinfile:
+        dest: "{{ sshd_config }}"
+        regexp: '^#?PermitRootLogin'
+        line: 'PermitRootLogin no'
+      notify: restart sshd
+
+    - name: Disable password login
+      lineinfile: 
+        dest: "{{ sshd_config }}" 
+        regexp: '^(#\s*)?PasswordAuthentication '
+        line: 'PasswordAuthentication no'
+      when: 
+        - add_identity_key is succeeded 
+        - not add_identity_key is skipped
+      notify: restart sshd
+
+    - name: Check unpartitioned space
+      shell: /sbin/parted /dev/mmcblk0 unit gb print free | grep 'Free Space' | tail -n1 | awk '{print $3}'
+      register: unpartitioned
+      changed_when: false
+      failed_when: unpartitioned.stderr != ""
+
+    - name: Expand filesystem to fill disk
+      command: raspi-config nonint do_expand_rootfs
+      when: unpartitioned.stdout != "0.00GB"
+
+    - name: Update cgroups settings
+      lineinfile:
+        dest: /boot/cmdline.txt
+        regexp: '(^(?!.*cgroup_enable.*$)[^\"]+)[\n]'
+        backrefs: yes
+        line: '\1 cgroup_enable=cpuset cgroup_memory=1 cgroup_enable=memory'
+      register: cmdline
+
+    #- name: Raspberry Pi Firmware upgrade
+    #  command: rpi-update | yes
+
+    - name: Reboot system
+      reboot:
+      when: (unpartitioned.stdout != "0.00GB") or (cmdline.changed)
