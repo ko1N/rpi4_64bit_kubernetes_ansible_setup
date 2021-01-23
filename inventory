@@ -1,13 +1,7 @@
-[all]
+[kube-master]
 192.168.178.48 hostname=clusterpi1
+
+[kube-node]
 192.168.178.49 hostname=clusterpi2
 192.168.178.50 hostname=clusterpi3
 192.168.178.51 hostname=clusterpi4
-
-[kube-master]
-192.168.178.48
-
-[kube-node]
-192.168.178.49
-192.168.178.50
-192.168.178.51
