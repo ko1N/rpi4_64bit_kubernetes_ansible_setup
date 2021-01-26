@@ -1,21 +1,15 @@
 ---
 - hosts: all
   become: true
-  gather_facts: false
-  pre_tasks:
-    - name: install python
-      raw: test -e /usr/bin/python || (apt -qqy update && apt install -y python)
-      register: output
-      changed_when: output.stdout != ""
 
-- hosts: all
-  become: true
   vars:
     sshd: ssh
     sshd_config: /etc/ssh/sshd_config
+
   handlers:
     - name: restart sshd
       service: name={{ sshd }} state=restarted
+
   tasks:
     - name: Upgrade all apt packages
       apt: upgrade=dist force_apt_get=yes

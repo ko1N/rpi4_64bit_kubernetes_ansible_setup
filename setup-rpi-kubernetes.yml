@@ -119,4 +119,4 @@
       shell: "{{ hostvars[groups['kube-master'][0]].join_command }} >> node_join.log"
       args:
         chdir: $HOME
-        creates: node
+        creates: node_join.log
