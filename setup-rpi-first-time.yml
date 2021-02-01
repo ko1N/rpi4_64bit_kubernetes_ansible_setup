@@ -61,7 +61,7 @@
 
     - name: Add identity key to authorized keys on host
       authorized_key: 
-        name: "{{ lookup('env', 'USER') }}"
+        user: "{{ lookup('env', 'USER') }}"
         key: "{{ lookup('file', lookup('env','HOME') + '/.ssh/id_rsa.pub') }}"
       register: add_identity_key
 
