@@ -16,6 +16,11 @@
       when: hostvars[item].ansible_default_ipv4.address is defined
       with_items: "{{ groups['all'] }}"
 
+    - name: Setup shared hostname (picluster.local)
+      lineinfile: path=/etc/hosts line="{{ hostvars[item].ansible_default_ipv4.address }} picluster.local" state=present
+      when: hostvars[item].ansible_default_ipv4.address is defined
+      with_items: "{{ groups['all'] }}"
+
     # Check if docker is running or install it otherwise
     - name: Check if docker is running
       command: docker run armhf/hello-world
@@ -43,6 +48,12 @@
     - name: Permanently disable swap
       command: dphys-swapfile swapoff && dphys-swapfile uninstall && update-rc.d dphys-swapfile remove
 
+    - name: Disable swap configuration
+      lineinfile:
+        path: /etc/dphys-swapfile
+        regexp: '^CONF_SWAPSIZE='
+        line: CONF_SWAPSIZE=0
+
     - name: Get Kubernetes apt-key
       apt_key:
         url: https://packages.cloud.google.com/apt/doc/apt-key.gpg
@@ -51,7 +62,7 @@
     # Note: currently the latest repository is still xenial not bionic
     - name: Add Kubernetes APT repository
       apt_repository:
-        repo: deb http://apt.kubernetes.io/ kubernetes-xenial main
+        repo: deb http://packages.cloud.google.com/apt/ kubernetes-xenial main
         state: present
         filename: 'kubernetes'
 
@@ -76,7 +87,7 @@
 
     # Initialize Cluster. The log is also used to prevent an second initialization
     - name: Initialize Cluster
-      shell: kubeadm init --pod-network-cidr=10.244.0.0/16 >> cluster_init.log
+      shell: "kubeadm init --pod-network-cidr=10.244.0.0/16 >> cluster_init.log"
       args:
         chdir: $HOME
         creates: cluster_init.log
@@ -113,7 +124,7 @@
   become: yes
   tasks:
     - name: Wait for master's port 6443
-      wait_for: "host={{ hostvars[groups['kube-master'][0]]['ansible_default_ipv4']['address'] }} port=6443 timeout=1"
+      wait_for: "host={{ hostvars[groups['kube-master'][0]].hostname }} port=6443 timeout=1"
 
     - name: Join the cluster. Use log to prevent joining twice
       shell: "{{ hostvars[groups['kube-master'][0]].join_command }} >> node_join.log"

@@ -1,7 +1,7 @@
 [kube-master]
-192.168.178.59 hostname=clusterpi1
+clusterpi1 hostname=clusterpi1
 
 [kube-node]
-192.168.178.56 hostname=clusterpi2
-192.168.178.58 hostname=clusterpi3
-192.168.178.55 hostname=clusterpi4
+clusterpi2 hostname=clusterpi2
+clusterpi3 hostname=clusterpi3
+clusterpi4 hostname=clusterpi4
