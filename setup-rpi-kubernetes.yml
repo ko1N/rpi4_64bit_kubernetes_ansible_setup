@@ -44,16 +44,6 @@
         dest: /etc/docker/daemon.json
       notify: restart docker
 
-    # Disabling swap is required for k8
-    - name: Permanently disable swap
-      command: dphys-swapfile swapoff && dphys-swapfile uninstall && update-rc.d dphys-swapfile remove
-
-    - name: Disable swap configuration
-      lineinfile:
-        path: /etc/dphys-swapfile
-        regexp: '^CONF_SWAPSIZE='
-        line: CONF_SWAPSIZE=0
-
     - name: Get Kubernetes apt-key
       apt_key:
         url: https://packages.cloud.google.com/apt/doc/apt-key.gpg
@@ -92,7 +82,7 @@
         chdir: $HOME
         creates: cluster_init.log
 
-    # Create the configuration / configuration directory
+    # Create the configuration directory
     - name: Create .kube directory
       file:
         path: $HOME/.kube
